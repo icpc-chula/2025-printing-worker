@@ -3,7 +3,7 @@ __pycache__/
 *.py[codz]
 *$py.class
 
-# C extensions
+# C extepython -m venv /path/to/new/virtual/environmennsions
 *.so
 
 # Distribution / packaging
