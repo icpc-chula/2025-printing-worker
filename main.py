@@ -2,6 +2,7 @@ from fastapi import FastAPI, status, UploadFile, File
 from fastapi.responses import JSONResponse
 import os
 import subprocess
+import tempfile
 import time
 
 app = FastAPI()
@@ -24,43 +25,39 @@ async def health_check():
 @app.post("/print")
 async def print_document(file: UploadFile = File(...)):
   if not file:
+    print("No file provided")
     return JSONResponse(
       status_code=status.HTTP_400_BAD_REQUEST,
       content={"message": "No file provided"}
     )
   
-  if file.content_type != "application/pdf":
-    return JSONResponse(
-      status_code=status.HTTP_400_BAD_REQUEST,
-      content={"message": "Invalid file type. Only PDF files are accepted."}
-    )
-  
   if file.filename.endswith(".pdf") == False:
+    print("Invalid file extension")
     return JSONResponse(
       status_code=status.HTTP_400_BAD_REQUEST,
       content={"message": "Invalid file extension. Only .pdf files are accepted."}
     )
     
   try:
-    with open(f"/tmp/{file.filename}", "wb") as temp_file:
+    tmp_dir = os.path.join(os.getcwd(), "tmp")
+    os.makedirs(tmp_dir, exist_ok=True)
+    
+    with tempfile.NamedTemporaryFile(dir=tmp_dir, suffix=f"_{file.filename}", delete=False) as temp_file:
       content = await file.read()
       temp_file.write(content)
+      temp_file_path = temp_file.name
     
-    if os.getEnv():
-      subprocess.run(["lpr", f"/tmp/{file.filename}"])
+    if os.environ.get('PY_ENV') == 'production':
+      subprocess.run(["lpr", temp_file_path])
     else:
       print("This is a development environment. Skipping actual print command...")
     print(f"File {file.filename} sent to printer")
   except Exception as e:
+    print("Failed to print the document:", str(e))
     return JSONResponse(
       status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
       content={"message": f"Failed to print the document: {str(e)}"}
     )
-  finally:
-    try:
-      subprocess.run(["rm", f"/tmp/{file.filename}"])
-    except Exception as e:
-      pass
   
   return JSONResponse(
     status_code=status.HTTP_200_OK,
